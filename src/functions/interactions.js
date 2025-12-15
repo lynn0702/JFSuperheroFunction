@@ -26,6 +26,11 @@ app.http('interactions', {
         const timestamp = request.headers.get('x-signature-timestamp');
         const rawBody = await request.text();
 
+// Log the inputs to see what's happening
+        context.log(`Signature: ${signature}`);
+        context.log(`Timestamp: ${timestamp}`);
+        context.log(`Public Key Present: ${!!process.env.DISCORD_PUBLIC_KEY}`); // True/False
+
         const isValidRequest = verifyKey(
             rawBody,
             signature,
@@ -34,8 +39,11 @@ app.http('interactions', {
         );
 
         if (!isValidRequest) {
+            context.log("Signature Verification FAILED"); // <--- Watch for this log
             return { status: 401, body: 'Bad request signature' };
         }
+        
+        context.log("Signature Verification PASSED"); // <--- Or this one
 
         const interaction = JSON.parse(rawBody);
 
