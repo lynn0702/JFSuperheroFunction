@@ -1,36 +1,35 @@
 const { app } = require('@azure/functions');
-const { verifyKey, InteractionType, InteractionResponseType } = require('discord-interactions');
+const { verifyKey } = require('discord-interactions');
 const fs = require('node:fs');
 const path = require('node:path');
 
 // Load commands into memory once when the function warms up
 const commands = new Map();
-const commandsPath = path.join(__dirname, '../../commands'); // Adjust path if needed based on your folder structure
-// Note: In Azure Functions, __dirname might be different. 
-// It is safer to put 'commands' folder at the root and require relatively.
 
-// simple loader
-const commandFiles = fs.readdirSync('commands').filter(file => file.endsWith('.js'));
-for (const file of commandFiles) {
-    const filePath = path.join(process.cwd(), 'commands', file);
-    const command = require(filePath);
-    commands.set(command.data.name, command);
+// Helper to load commands safely
+try {
+    const commandFiles = fs.readdirSync('commands').filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+        const filePath = path.join(process.cwd(), 'commands', file);
+        const command = require(filePath);
+        commands.set(command.data.name, command);
+    }
+} catch (error) {
+    console.error("Warning: Could not load commands. This is expected during the initial PING.", error);
 }
 
 app.http('interactions', {
     methods: ['POST'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
-        // 1. Verify the Request (Mandatory for Webhooks)
+        // 1. Verify the Request
         const signature = request.headers.get('x-signature-ed25519');
         const timestamp = request.headers.get('x-signature-timestamp');
         const rawBody = await request.text();
 
-// Log the inputs to see what's happening
-        context.log(`Signature: ${signature}`);
-        context.log(`Timestamp: ${timestamp}`);
-        context.log(`Public Key Present: ${!!process.env.DISCORD_PUBLIC_KEY}`); // True/False
-
+        // Debug Log: Check Validation
+        context.log(`Verifying Signature...`);
+        
         const isValidRequest = verifyKey(
             rawBody,
             signature,
@@ -39,25 +38,29 @@ app.http('interactions', {
         );
 
         if (!isValidRequest) {
-            context.log("Signature Verification FAILED"); // <--- Watch for this log
+            context.log("Signature Verification FAILED");
             return { status: 401, body: 'Bad request signature' };
         }
         
-        context.log("Signature Verification PASSED"); // <--- Or this one
+        context.log("Signature Verification PASSED");
 
         const interaction = JSON.parse(rawBody);
+        context.log(`Interaction Type: ${interaction.type}`); // <--- CRITICAL LOG
 
-        // 2. Handle PING (Discord checks this to verify your bot is alive)
-        if (interaction.type === InteractionType.PING) {
+        // 2. Handle PING (Type 1)
+        // We use '1' explicitly to avoid any import issues with the library
+        if (interaction.type === 1) {
+            context.log("Returning PONG");
             return {
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: InteractionResponseType.PONG })
+                jsonBody: { type: 1 } // Standard PONG response
             };
         }
 
-        // 3. Handle Commands
-        if (interaction.type === InteractionType.APPLICATION_COMMAND) {
+        // 3. Handle Commands (Type 2)
+        if (interaction.type === 2) {
             const commandName = interaction.data.name;
+            context.log(`Executing Command: ${commandName}`);
+            
             const command = commands.get(commandName);
 
             if (!command) {
@@ -65,25 +68,21 @@ app.http('interactions', {
             }
 
             try {
-                // Execute the modified command logic
                 const responseData = await command.execute(interaction);
                 
-                // Send response back to Discord
                 return {
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    jsonBody: {
+                        type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
                         data: responseData
-                    })
+                    }
                 };
             } catch (error) {
                 context.error(error);
                 return {
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    jsonBody: {
+                        type: 4,
                         data: { content: 'There was an error executing this command.' }
-                    })
+                    }
                 };
             }
         }
