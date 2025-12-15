@@ -68,6 +68,10 @@ jobs:
           app-name: 'JFSuperHeroFunction'
           slot-name: 'Production'
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-
+          sku: 'flexconsumption'
+          remote-build: true
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_1080E73A9CD2472FB75CC5914A4A9A68 }}
+          scm-do-build-during-deployment: true
+          enable-oryx-build: true
+
 
