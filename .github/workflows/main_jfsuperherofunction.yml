@@ -65,7 +65,8 @@ jobs:
         uses: Azure/functions-action@v1
         id: fa
         with:
-          app-name: 'JFSuperHeroFunction'
+          app-name: 'jfsuperherofunction-fzbqb9hqc5h3f0ek'
           slot-name: 'Production'
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_1080E73A9CD2472FB75CC5914A4A9A68 }}
