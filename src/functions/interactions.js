@@ -3,26 +3,32 @@ const { verifyKey } = require('discord-interactions');
 const fs = require('node:fs');
 const path = require('node:path');
 
-// Load commands into memory once when the function warms up
-const commands = new Map();
+// Global cache for commands (starts empty)
+let commandsCache = null;
 
-try {
-    // In Azure, the files are usually in the current working directory
-    const commandFiles = fs.readdirSync('commands').filter(file => file.endsWith('.js'));
-    for (const file of commandFiles) {
-        const filePath = path.join(process.cwd(), 'commands', file);
-        const command = require(filePath);
-        commands.set(command.data.name, command);
+// Helper to load commands ONLY when needed
+function getCommands() {
+    if (commandsCache) return commandsCache;
+    
+    commandsCache = new Map();
+    try {
+        const commandFiles = fs.readdirSync('commands').filter(file => file.endsWith('.js'));
+        for (const file of commandFiles) {
+            const filePath = path.join(process.cwd(), 'commands', file);
+            const command = require(filePath);
+            commandsCache.set(command.data.name, command);
+        }
+    } catch (error) {
+        console.error("Command loading error:", error);
     }
-} catch (error) {
-    console.error("Warning: Could not load commands. This is expected during the initial PING if folders aren't synced yet.", error);
+    return commandsCache;
 }
 
 app.http('interactions', {
     methods: ['POST'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
-        // 1. Verify the Request
+        // 1. Verify Request (Fastest check first)
         const signature = request.headers.get('x-signature-ed25519');
         const timestamp = request.headers.get('x-signature-timestamp');
         const rawBody = await request.text();
@@ -35,26 +41,23 @@ app.http('interactions', {
         );
 
         if (!isValidRequest) {
-            context.log("Signature Verification FAILED");
             return { status: 401, body: 'Bad request signature' };
         }
 
         const interaction = JSON.parse(rawBody);
 
-        // 2. Handle PING (Type 1)
+        // 2. Handle PING (INSTANT RETURN)
+        // We return immediately without loading any files or commands
         if (interaction.type === 1) {
-            context.log("Returning PONG (Explicit)");
             return {
                 status: 200,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ type: 1 })
+                jsonBody: { type: 1 }
             };
         }
 
-        // 3. Handle Commands (Type 2)
+        // 3. Handle Commands (Load files now)
         if (interaction.type === 2) {
+            const commands = getCommands(); // <--- Lazy load happens here
             const commandName = interaction.data.name;
             const command = commands.get(commandName);
 
@@ -64,27 +67,21 @@ app.http('interactions', {
 
             try {
                 const responseData = await command.execute(interaction);
-                
-                // Return explicit JSON response for commands too
                 return {
                     status: 200,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+                    jsonBody: {
+                        type: 4, 
                         data: responseData
-                    })
+                    }
                 };
             } catch (error) {
                 context.error(error);
                 return {
                     status: 200,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                    jsonBody: {
                         type: 4,
-                        data: { content: 'There was an error executing this command.' }
-                    })
+                        data: { content: 'Error executing command' }
+                    }
                 };
             }
         }
