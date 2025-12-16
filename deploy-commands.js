@@ -2,9 +2,9 @@ require('dotenv').config();
 const { REST, Routes } = require('discord.js');
 const fs = require('node:fs');
 
-const token = process.env.DISCORD_TOKEN || require('./config.json').token;
-const clientId = process.env.DISCORD_CLIENT_ID || require('./config.json').clientId;
-const guildId = process.env.DISCORD_GUILD_ID || require('./config.json').guildId;
+const token = process.env.DISCORD_TOKEN || require('./local.settings.json').Values.token;
+const clientId = process.env.DISCORD_CLIENT_ID || require('./local.settings.json').Values.clientId;
+const guildId = process.env.DISCORD_GUILD_ID || require('./local.settings.json').Values.guildId;
 
 const commands = [];
 // Grab all the command files from the commands directory you created earlier
@@ -15,7 +15,7 @@ for (const file of commandFiles) {
 	const command = require(`./commands/${file}`);
 	commands.push(command.data.toJSON());
 }
-
+console.log("token:"+token);
 // Construct and prepare an instance of the REST module
 const rest = new REST({ version: '10' }).setToken(token);
 

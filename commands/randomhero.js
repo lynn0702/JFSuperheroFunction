@@ -1,4 +1,3 @@
-const { SlashCommandBuilder } = require('discord.js');
 const { 
     makeCharacter,
     discordFormattedHero,
@@ -8,13 +7,18 @@ const {
 } = require("../JFSuperheroes.js");
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('randomhero')
-        .setDescription('Creates a random hero fit for use in Cortex Prime!')
-        .addBooleanOption(option =>
-            option
-                .setName('fulltext')
-                .setDescription('Include full details')),
+    get data() {
+        const { SlashCommandBuilder } = require('discord.js');
+        
+        return new SlashCommandBuilder()
+            .setName('randomhero')
+            .setDescription('Creates a random hero fit for use in Cortex Prime!')
+            .addBooleanOption(option =>
+                option
+                    .setName('fulltext')
+                    .setDescription('Include full details')
+            );
+    },
     
     async execute(interaction) {
         // 1. Manually parse the option (since we don't have discord.js helpers here)

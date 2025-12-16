@@ -1,16 +1,19 @@
-const { SlashCommandBuilder } = require('discord.js');
-const {    makeCharacter,
+const {    
+    makeCharacter,
     getPowersetsDiscordString,
-    } = require ('../JFSuperheroes.js');
+} = require ('../JFSuperheroes.js');
 
 module.exports = {
-	data: new SlashCommandBuilder()
-		.setName('powersets')
-		.setDescription('Gets powersets for a random hero.'),
-	async execute(interaction) {
+    get data() {
+        const { SlashCommandBuilder } = require('discord.js');
+        return new SlashCommandBuilder()
+            .setName('powersets')
+            .setDescription('Gets powersets for a random hero.');
+    },
+    async execute(interaction) {
         let character = makeCharacter(true);
-		return {
-			content: getMilestonesDiscordString(character)
-		};
-	},
+        return {
+            content: getPowersetsDiscordString(character)
+        };
+    },
 };

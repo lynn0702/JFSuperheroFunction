@@ -1,9 +1,10 @@
-const { SlashCommandBuilder } = require('discord.js');
-
 module.exports = {
-	data: new SlashCommandBuilder()
-		.setName('about')
-		.setDescription('Links for supporting documents.'),
+    get data() {
+        const { SlashCommandBuilder } = require('discord.js');
+        return new SlashCommandBuilder()
+            .setName('about')
+            .setDescription('Links for supporting documents.');
+    },
 async execute(interaction) {
     return {
         content:
