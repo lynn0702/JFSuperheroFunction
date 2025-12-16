@@ -5,7 +5,7 @@ const {
     getMainCharacterDiscordString,
     getPowersetsDiscordString,
     getMilestonesDiscordString
-} = require('../JFSuperheroes.js');
+} = require('../../JFSuperheroes.js');
 
 app.http('publicApi', {
     methods: ['GET'],
