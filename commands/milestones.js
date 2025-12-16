@@ -5,7 +5,7 @@ module.exports = {
         const { SlashCommandBuilder } = require('discord.js');
         return new SlashCommandBuilder()
             .setName('milestones')
-            .setDescription('Gets powersets for a random hero.');
+            .setDescription('Gets milestones for a random hero.');
     },
     async execute(interaction) {
         let character = makeCharacter(true);

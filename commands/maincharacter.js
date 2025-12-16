@@ -1,18 +1,16 @@
-const { get_main_character } = require('../JFSuperheroes'); 
+const {    makeCharacter,
+    getMainCharacterDiscordString }  = require('../JFSuperheroes.js'); 
 
 module.exports = {
     get data() {
         const { SlashCommandBuilder } = require('discord.js');
         return new SlashCommandBuilder()
-            .setName('maincharacter')
-            .setDescription('Generates a Main Character!');
+		.setName('maincharacter')
+		.setDescription('Gets a random set of distinctions, affiliations, and specialties.')
     },
     
-    async execute(interaction) {
-        const result = get_main_character();
-        
-        return {
-            content: result
-        };
-    },
+	async execute(interaction) {
+        let character = makeCharacter(true);
+        await interaction.reply(getMainCharacterDiscordString(character));
+	},
 };
