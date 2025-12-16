@@ -3,10 +3,10 @@ const { verifyKey } = require('discord-interactions');
 const fs = require('node:fs');
 const path = require('node:path');
 
-// Global cache for commands (starts empty)
+// 1. Global Cache (Starts empty to save time)
 let commandsCache = null;
 
-// Helper to load commands ONLY when needed
+// 2. Lazy Loader (Only runs when we actually need a command)
 function getCommands() {
     if (commandsCache) return commandsCache;
     
@@ -15,6 +15,7 @@ function getCommands() {
         const commandFiles = fs.readdirSync('commands').filter(file => file.endsWith('.js'));
         for (const file of commandFiles) {
             const filePath = path.join(process.cwd(), 'commands', file);
+            // This 'require' triggers discord.js loading, so we only do it here!
             const command = require(filePath);
             commandsCache.set(command.data.name, command);
         }
@@ -28,7 +29,7 @@ app.http('interactions', {
     methods: ['POST'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
-        // 1. Verify Request (Fastest check first)
+        // 3. Verify Request (Fastest check first)
         const signature = request.headers.get('x-signature-ed25519');
         const timestamp = request.headers.get('x-signature-timestamp');
         const rawBody = await request.text();
@@ -39,25 +40,27 @@ app.http('interactions', {
             timestamp,
             process.env.DISCORD_PUBLIC_KEY
         );
-
+//log 
+context.log("isValidRequest:", isValidRequest);
         if (!isValidRequest) {
             return { status: 401, body: 'Bad request signature' };
         }
 
         const interaction = JSON.parse(rawBody);
 
-        // 2. Handle PING (INSTANT RETURN)
-        // We return immediately without loading any files or commands
+        // 4. Handle PING (INSTANT RETURN)
+        // We return immediately without loading discord.js
         if (interaction.type === 1) {
             return {
                 status: 200,
-                jsonBody: { type: 1 }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 1 })
             };
         }
 
-        // 3. Handle Commands (Load files now)
+        // 5. Handle Commands (Load heavy libraries now)
         if (interaction.type === 2) {
-            const commands = getCommands(); // <--- Lazy load happens here
+            const commands = getCommands(); // <--- Heavy loading happens here
             const commandName = interaction.data.name;
             const command = commands.get(commandName);
 
@@ -69,19 +72,21 @@ app.http('interactions', {
                 const responseData = await command.execute(interaction);
                 return {
                     status: 200,
-                    jsonBody: {
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
                         type: 4, 
                         data: responseData
-                    }
+                    })
                 };
             } catch (error) {
                 context.error(error);
                 return {
                     status: 200,
-                    jsonBody: {
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
                         type: 4,
                         data: { content: 'Error executing command' }
-                    }
+                    })
                 };
             }
         }
