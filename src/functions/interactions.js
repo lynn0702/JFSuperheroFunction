@@ -40,7 +40,8 @@ app.http('interactions', {
             timestamp,
             process.env.DISCORD_PUBLIC_KEY
         );
-
+//log 
+context.log("isValidRequest:", isValidRequest);
         if (!isValidRequest) {
             return { status: 401, body: 'Bad request signature' };
         }
