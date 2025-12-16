@@ -3,10 +3,10 @@ const { verifyKey } = require('discord-interactions');
 const fs = require('node:fs');
 const path = require('node:path');
 
-// 1. Global Cache (Starts empty to save time)
+// 1. Global Cache
 let commandsCache = null;
 
-// 2. Lazy Loader (Only runs when we actually need a command)
+// 2. Lazy Loader
 function getCommands() {
     if (commandsCache) return commandsCache;
     
@@ -15,7 +15,6 @@ function getCommands() {
         const commandFiles = fs.readdirSync('commands').filter(file => file.endsWith('.js'));
         for (const file of commandFiles) {
             const filePath = path.join(process.cwd(), 'commands', file);
-            // This 'require' triggers discord.js loading, so we only do it here!
             const command = require(filePath);
             commandsCache.set(command.data.name, command);
         }
@@ -29,27 +28,26 @@ app.http('interactions', {
     methods: ['POST'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
-        // 3. Verify Request (Fastest check first)
+        // 3. Verify Request
         const signature = request.headers.get('x-signature-ed25519');
         const timestamp = request.headers.get('x-signature-timestamp');
         const rawBody = await request.text();
 
-        const isValidRequest = verifyKey(
+        // FIX: verifyKey is async in newer versions of discord-interactions
+        const isValidRequest = await verifyKey(
             rawBody,
             signature,
             timestamp,
             process.env.DISCORD_PUBLIC_KEY
         );
-//log 
-context.log("isValidRequest:", isValidRequest);
+
         if (!isValidRequest) {
             return { status: 401, body: 'Bad request signature' };
         }
 
         const interaction = JSON.parse(rawBody);
 
-        // 4. Handle PING (INSTANT RETURN)
-        // We return immediately without loading discord.js
+        // 4. Handle PING (Type 1)
         if (interaction.type === 1) {
             return {
                 status: 200,
@@ -58,9 +56,9 @@ context.log("isValidRequest:", isValidRequest);
             };
         }
 
-        // 5. Handle Commands (Load heavy libraries now)
+        // 5. Handle Commands (Type 2)
         if (interaction.type === 2) {
-            const commands = getCommands(); // <--- Heavy loading happens here
+            const commands = getCommands();
             const commandName = interaction.data.name;
             const command = commands.get(commandName);
 
