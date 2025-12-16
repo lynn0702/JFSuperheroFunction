@@ -11,6 +11,8 @@ module.exports = {
     
 	async execute(interaction) {
         let character = makeCharacter(true);
-        await interaction.reply(getMainCharacterDiscordString(character));
+        return {
+			content: getMainCharacterDiscordString(character)
+		}
 	},
 };
