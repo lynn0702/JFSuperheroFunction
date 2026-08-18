@@ -1,4 +1,8 @@
 @inherits LayoutComponentBase
+@using SuperHeroes.Client.Services
+@using SuperHeroes.Client.Components
+@inject GoogleDriveSyncService DriveSync
+@inject NavigationManager NavManager
 
 <div class="page hero-app-container">
     <div class="sidebar">
@@ -11,7 +15,18 @@
                 <span class="status-indicator"></span>
                 <span>heroes.lynnjones.rocks</span>
             </div>
-            <div class="header-links">
+            
+            <div class="header-right-actions">
+                <button type="button" class="btn-nav-sync @(DriveSync.IsAuthenticated ? "sync-connected" : "")"
+                        @onclick="() => isSyncModalOpen = true" title="Google Drive Cloud Sync">
+                    <span class="sync-nav-icon">☁️</span>
+                    <span class="sync-nav-text">@(DriveSync.IsAuthenticated ? (DriveSync.UserEmail ?? "Cloud Sync") : "Cloud Sync")</span>
+                    @if (DriveSync.IsAuthenticated)
+                    {
+                        <span class="nav-connected-dot" title="Connected to Google Drive"></span>
+                    }
+                </button>
+
                 <a href="https://github.com/lynn0702/JFSuperheroFunction" target="_blank" rel="noopener noreferrer" class="github-link">
                     GitHub Repo
                 </a>
@@ -22,4 +37,17 @@
             @Body
         </article>
     </main>
+
+    <!-- Cloud Sync Modal Dialog -->
+    <GoogleDriveSyncModal @bind-IsOpen="isSyncModalOpen" OnDataSynced="HandleDataSynced" />
 </div>
+
+@code {
+    private bool isSyncModalOpen = false;
+
+    private void HandleDataSynced()
+    {
+        // Force refresh active page components
+        StateHasChanged();
+    }
+}

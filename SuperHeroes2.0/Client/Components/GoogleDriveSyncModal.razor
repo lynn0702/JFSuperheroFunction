@@ -1,0 +1,188 @@
+@using SuperHeroes.Client.Services
+@inject GoogleDriveSyncService DriveSync
+@implements IDisposable
+
+@if (IsOpen)
+{
+    <div class="sync-modal-backdrop" @onclick="Close">
+        <div class="sync-modal-dialog glass-card" @onclick:stopPropagation="true">
+            <div class="sync-modal-header">
+                <div class="sync-title-wrap">
+                    <span class="sync-icon">☁️</span>
+                    <h3 class="sync-title">GOOGLE DRIVE CLOUD SYNC</h3>
+                </div>
+                <button type="button" class="btn-close-modal" @onclick="Close">✕</button>
+            </div>
+
+            <div class="sync-modal-body">
+                <!-- Connection Status Card -->
+                <div class="sync-status-card @(DriveSync.IsAuthenticated ? "status-connected" : "status-disconnected")">
+                    <div class="status-indicator-dot"></div>
+                    <div class="status-info">
+                        <strong class="status-title">
+                            @(DriveSync.IsAuthenticated ? "Connected to Google Drive" : "Not Connected")
+                        </strong>
+                        <span class="status-subtitle">
+                            @(DriveSync.IsAuthenticated 
+                                ? (DriveSync.UserEmail ?? "Active Session") 
+                                : "Sign in to backup and restore heroes across your devices.")
+                        </span>
+                        @if (DriveSync.LastSyncedAt.HasValue)
+                        {
+                            <span class="status-timestamp">
+                                Last synced: @DriveSync.LastSyncedAt.Value.ToLocalTime().ToString("g")
+                            </span>
+                        }
+                    </div>
+                    <div class="status-action">
+                        @if (DriveSync.IsAuthenticated)
+                        {
+                            <button type="button" class="btn-disconnect" @onclick="DriveSync.Disconnect" disabled="@DriveSync.IsBusy">
+                                Disconnect
+                            </button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn-connect-google pulse-glow" @onclick="DriveSync.RequestTokenAsync" disabled="@DriveSync.IsBusy">
+                                🔗 Sign In with Google
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(DriveSync.StatusMessage))
+                {
+                    <div class="sync-alert @(DriveSync.StatusMessage.StartsWith("✓") ? "alert-success" : DriveSync.StatusMessage.StartsWith("Failed") || DriveSync.StatusMessage.StartsWith("Push failed") || DriveSync.StatusMessage.StartsWith("Pull failed") ? "alert-danger" : "alert-info")">
+                        @DriveSync.StatusMessage
+                    </div>
+                }
+
+                @if (DriveSync.IsAuthenticated)
+                {
+                    <!-- Sync Action Controls -->
+                    <div class="sync-actions-grid">
+                        <div class="sync-action-card">
+                            <div class="action-card-header">
+                                <span class="action-card-icon">⬆️</span>
+                                <div>
+                                    <h4 class="action-card-title">Push to Drive</h4>
+                                    <p class="action-card-desc">Back up local bookmarks, custom traits & dice themes to Google Drive.</p>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-sync-action btn-push" @onclick="HandlePush" disabled="@DriveSync.IsBusy">
+                                @(DriveSync.IsBusy ? "Processing..." : "⬆️ Push Local Data to Drive")
+                            </button>
+                        </div>
+
+                        <div class="sync-action-card">
+                            <div class="action-card-header">
+                                <span class="action-card-icon">⬇️</span>
+                                <div>
+                                    <h4 class="action-card-title">Pull from Drive</h4>
+                                    <p class="action-card-desc">Download backup from Google Drive to this device.</p>
+                                </div>
+                            </div>
+                            <div class="pull-options-row">
+                                <label class="pull-merge-checkbox">
+                                    <input type="checkbox" @bind="mergeOnPull" />
+                                    <span>Merge with existing local heroes</span>
+                                </label>
+                            </div>
+                            <button type="button" class="btn-sync-action btn-pull" @onclick="HandlePull" disabled="@DriveSync.IsBusy">
+                                @(DriveSync.IsBusy ? "Processing..." : "⬇️ Pull Data from Drive")
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                <!-- Config Drawer -->
+                <div class="sync-settings-section">
+                    <button type="button" class="btn-toggle-settings" @onclick="() => showSettings = !showSettings">
+                        ⚙️ @(showSettings ? "Hide Advanced Settings" : "Advanced OAuth Client Settings")
+                    </button>
+                    @if (showSettings)
+                    {
+                        <div class="sync-settings-panel">
+                            <div class="mb-2">
+                                <label class="form-label text-muted small">Google OAuth 2.0 Client ID:</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control form-control-sm" @bind="customClientIdInput" />
+                                    <button class="btn btn-outline-primary btn-sm" @onclick="SaveCustomClientId">Save</button>
+                                    <button class="btn btn-outline-secondary btn-sm" @onclick="ResetDefaultClientId">Reset Default</button>
+                                </div>
+                            </div>
+                            <div class="settings-hint">
+                                Uses restricted <code>drive.file</code> scope. The app only has access to files it creates (<code>CortexSuperHeroes_Backup.json</code>).
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="sync-modal-footer">
+                <button type="button" class="btn-action-icon" @onclick="Close">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback OnDataSynced { get; set; }
+
+    private bool mergeOnPull = true;
+    private bool showSettings = false;
+    private string customClientIdInput = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        DriveSync.OnStateChanged += HandleStateChanged;
+        customClientIdInput = DriveSync.ClientId;
+    }
+
+    private void HandleStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task Close()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task HandlePush()
+    {
+        var ok = await DriveSync.PushToDriveAsync();
+        if (ok)
+        {
+            await OnDataSynced.InvokeAsync();
+        }
+    }
+
+    private async Task HandlePull()
+    {
+        var ok = await DriveSync.PullFromDriveAsync(mergeOnPull);
+        if (ok)
+        {
+            await OnDataSynced.InvokeAsync();
+        }
+    }
+
+    private async Task SaveCustomClientId()
+    {
+        await DriveSync.SetCustomClientIdAsync(customClientIdInput);
+    }
+
+    private async Task ResetDefaultClientId()
+    {
+        customClientIdInput = GoogleDriveSyncService.DefaultClientId;
+        await DriveSync.SetCustomClientIdAsync(customClientIdInput);
+    }
+
+    public void Dispose()
+    {
+        DriveSync.OnStateChanged -= HandleStateChanged;
+    }
+}

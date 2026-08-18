@@ -11,14 +11,18 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 builder.Services.AddScoped<DiceThemeService>();
 builder.Services.AddScoped<CustomLibraryService>();
 builder.Services.AddScoped<HeroApiService>();
+builder.Services.AddScoped<GoogleDriveSyncService>();
 
 var host = builder.Build();
 
-// Initialize theme preferences and custom library from local storage
+// Initialize theme preferences, custom library, and drive sync from local storage
 var themeService = host.Services.GetRequiredService<DiceThemeService>();
 await themeService.InitializeAsync();
 
 var libraryService = host.Services.GetRequiredService<CustomLibraryService>();
 await libraryService.InitializeAsync();
+
+var driveSyncService = host.Services.GetRequiredService<GoogleDriveSyncService>();
+await driveSyncService.InitializeAsync();
 
 await host.RunAsync();
