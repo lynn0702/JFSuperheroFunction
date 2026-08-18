@@ -1,0 +1,48 @@
+@page "/about"
+
+<PageTitle>About | heroes.lynnjones.rocks</PageTitle>
+
+<div class="about-page">
+    <div class="glass-panel about-card">
+        <h1 class="brand-title">ABOUT CORTEX HERO GENERATOR</h1>
+        <p class="lead-text">
+            This tool generates algorithmically balanced superheroes compatible with the <strong>Cortex Prime</strong> roleplaying system, using a generation procedure created by <strong>Jeremy Forbing</strong>.
+        </p>
+
+        <div class="about-section-grid">
+            <div class="about-box">
+                <h3>📜 Jeremy Forbing's Procedure</h3>
+                <p>The character generation procedure and mathematical trait distribution tables are based on Jeremy Forbing's design documents:</p>
+                <ul>
+                    <li><a href="https://docs.google.com/document/d/1CiZwR1cMcBa1pUYRxXFFId9YfPmhqzO-JOQ8uLb4tCE" target="_blank" rel="noopener noreferrer">Character Generation Procedure Document</a></li>
+                    <li><a href="https://docs.google.com/document/d/1GRVdMo7x-Q-8n7dFpiDr2Q9kK8YWGCJ8hbXeWSt10HY" target="_blank" rel="noopener noreferrer">All Cortex Milestones Reference</a></li>
+                </ul>
+            </div>
+
+            <div class="about-box">
+                <h3>☁️ Zero-Cost Architecture</h3>
+                <p>Designed to operate on an extreme low-cost / hobbyist budget ($0.00 / month):</p>
+                <ul>
+                    <li><strong>Frontend:</strong> Hosted on Azure Static Web Apps (Free Tier) with automatic SSL certificate at <code>heroes.lynnjones.rocks</code>.</li>
+                    <li><strong>Backend:</strong> Azure Functions Consumption Plan with 1 Million free API executions / month.</li>
+                    <li><strong>Offline Fallback:</strong> Client-side WebAssembly generation fallback during serverless cold starts.</li>
+                </ul>
+            </div>
+
+            <div class="about-box">
+                <h3>🔌 Public API Access</h3>
+                <p>The backend function exposes endpoints for programmatic hero generation:</p>
+                <div class="code-snippet">
+                    <code>GET /api/hero</code> - Returns a complete random superhero in JSON.<br/>
+                    <code>GET /api/hero/10</code> - Returns a batch of 10 superheroes.<br/>
+                    <code>GET /api/hero?format=text</code> - Returns Discord markdown format.
+                </div>
+            </div>
+
+            <div class="about-box">
+                <h3>🎨 Vector Polyhedral Dice</h3>
+                <p>Upgraded from the <a href="https://github.com/lynn0702/CortexUtilities" target="_blank" rel="noopener noreferrer">CortexUtilities</a> project with live SVG color selection for d2, d4, d6, d8, d10, and d12 dice.</p>
+            </div>
+        </div>
+    </div>
+</div>

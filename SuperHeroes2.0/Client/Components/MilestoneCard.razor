@@ -1,0 +1,117 @@
+@using SuperHeroes.Client.Models
+@using SuperHeroes.Client.Services
+@inject CustomLibraryService LibraryService
+
+<div class="milestone-card comic-subpanel @(IsEditMode ? "edit-mode-panel" : "")">
+    <div class="milestone-title-row">
+        <span class="milestone-star">★</span>
+        @if (IsEditMode)
+        {
+            <input type="text" class="form-control milestone-name-input"
+                   value="@MilestoneName"
+                   placeholder="Milestone Name"
+                   @onchange="e => RenameMilestone(e.Value?.ToString())" />
+            <button type="button" class="btn-delete-item"
+                    @onclick="() => OnDeleteMilestone.InvokeAsync()" title="Remove Milestone">✕</button>
+        }
+        else
+        {
+            <span class="milestone-name">@MilestoneName</span>
+        }
+    </div>
+
+    @if (IsEditMode)
+    {
+        <div class="milestone-edit-desc-wrap">
+            <label class="section-micro-header">XP TRIGGERS & DESCRIPTION</label>
+            <textarea class="form-control desc-textarea"
+                      rows="4"
+                      placeholder="• 1 XP when...\n• 3 XP when...\n• 10 XP when..."
+                      value="@CurrentDescription"
+                      @onchange="e => UpdateDescription(e.Value?.ToString())"></textarea>
+        </div>
+    }
+    else
+    {
+        <div class="milestone-steps">
+            @foreach (var line in GetMilestoneLines())
+            {
+                <div class="milestone-step-row">
+                    @if (line.StartsWith("• 1 XP") || line.StartsWith("1 XP"))
+                    {
+                        <span class="xp-badge xp-1">1 XP</span>
+                        <span class="xp-text">@CleanXpText(line, "1 XP")</span>
+                    }
+                    else if (line.StartsWith("• 3 XP") || line.StartsWith("3 XP"))
+                    {
+                        <span class="xp-badge xp-3">3 XP</span>
+                        <span class="xp-text">@CleanXpText(line, "3 XP")</span>
+                    }
+                    else if (line.StartsWith("• 10 XP") || line.StartsWith("10 XP"))
+                    {
+                        <span class="xp-badge xp-10">10 XP</span>
+                        <span class="xp-text">@CleanXpText(line, "10 XP")</span>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(line))
+                    {
+                        <span class="xp-text plain-step">@line</span>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string MilestoneName { get; set; } = string.Empty;
+    [Parameter] public HeroModel? Hero { get; set; }
+    [Parameter] public bool IsEditMode { get; set; } = false;
+    [Parameter] public EventCallback<string> OnMilestoneChanged { get; set; }
+    [Parameter] public EventCallback OnDeleteMilestone { get; set; }
+
+    private string CurrentDescription =>
+        LibraryService.GetMilestoneDescription(MilestoneName, Hero);
+
+    private IEnumerable<string> GetMilestoneLines()
+    {
+        var raw = CurrentDescription;
+        return raw.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    private string CleanXpText(string line, string xpPrefix)
+    {
+        var cleaned = line.TrimStart('•', ' ', '\t');
+        if (cleaned.StartsWith(xpPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            cleaned = cleaned.Substring(xpPrefix.Length).TrimStart(' ', ':', '-');
+        }
+        return cleaned;
+    }
+
+    private async Task RenameMilestone(string? newName)
+    {
+        if (!string.IsNullOrWhiteSpace(newName))
+        {
+            var oldName = MilestoneName;
+            var trimmed = newName.Trim();
+            if (Hero != null && Hero.CustomMilestoneDescriptions.TryGetValue(oldName, out var desc))
+            {
+                Hero.CustomMilestoneDescriptions.Remove(oldName);
+                Hero.CustomMilestoneDescriptions[trimmed] = desc;
+            }
+            await OnMilestoneChanged.InvokeAsync(trimmed);
+        }
+    }
+
+    private async Task UpdateDescription(string? desc)
+    {
+        if (!string.IsNullOrWhiteSpace(MilestoneName) && desc != null)
+        {
+            if (Hero != null)
+            {
+                Hero.CustomMilestoneDescriptions[MilestoneName] = desc;
+            }
+            await LibraryService.SaveCustomMilestoneAsync(MilestoneName, desc);
+        }
+    }
+}

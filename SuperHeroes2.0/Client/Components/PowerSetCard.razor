@@ -1,0 +1,303 @@
+@using SuperHeroes.Client.Models
+@using SuperHeroes.Client.Services
+@inject CustomLibraryService LibraryService
+
+<div class="powerset-card comic-subpanel @(IsEditMode ? "edit-mode-panel" : "")">
+    <div class="powerset-header">
+        @if (IsEditMode)
+        {
+            <div class="powerset-edit-title-row">
+                <input type="text" class="form-control powerset-name-input"
+                       placeholder="Power Set Name (e.g. SUPER-SOLDIER SERUM)"
+                       @bind="PowerSet.Name" />
+                <button type="button" class="btn-delete-item btn-delete-powerset"
+                        @onclick="() => OnDeletePowerSet.InvokeAsync()" title="Delete this Power Set">
+                    🗑️ Delete Power Set
+                </button>
+            </div>
+        }
+        else
+        {
+            <span class="powerset-badge">
+                @(string.IsNullOrWhiteSpace(PowerSet.Name) ? $"POWER SET {Index}" : PowerSet.Name.ToUpper())
+            </span>
+        }
+    </div>
+
+    <!-- Power Traits -->
+    <div class="powers-section-wrap">
+        @if (IsEditMode)
+        {
+            <span class="section-micro-header">POWERS</span>
+            <div class="powers-edit-list">
+                @for (int i = 0; i < PowerSet.Powers.Count; i++)
+                {
+                    var powerIndex = i;
+                    var power = PowerSet.Powers[powerIndex];
+                    <div class="power-edit-row">
+                        <input type="text" list="power-suggestions" class="form-control power-name-input"
+                               placeholder="Power Name" @bind="power.Name" />
+                        <select class="form-select die-select" @bind="power.Rating">
+                            @foreach (var d in CortexRulesData.AvailableDice)
+                            {
+                                <option value="@d">d@(d)</option>
+                            }
+                        </select>
+                        <CortexDice Die="@power.Rating" Size="small" />
+                        <button type="button" class="btn-delete-item"
+                                @onclick="() => RemovePower(powerIndex)" title="Remove Power">✕</button>
+                    </div>
+                }
+                <button type="button" class="btn-add-mini" @onclick="AddPower">+ Add Power</button>
+            </div>
+        }
+        else
+        {
+            <div class="powers-list">
+                @foreach (var power in PowerSet.Powers)
+                {
+                    <div class="power-trait-chip">
+                        <CortexDice Die="@power.Rating" Size="small" />
+                        <span class="power-name">@power.Name</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- SFX Section -->
+    <div class="sfx-section">
+        <span class="section-micro-header">SFX ABILITIES</span>
+        @if (IsEditMode)
+        {
+            <div class="sfx-edit-list">
+                @for (int i = 0; i < PowerSet.Sfx.Count; i++)
+                {
+                    var sfxIndex = i;
+                    var sfxName = PowerSet.Sfx[sfxIndex];
+                    var currentDesc = LibraryService.GetSfxDescription(sfxName, Hero);
+
+                    <div class="sfx-edit-block">
+                        <div class="sfx-edit-row">
+                            <span class="sfx-tag">SFX</span>
+                            <input type="text" class="form-control sfx-input"
+                                   value="@sfxName"
+                                   placeholder="SFX Name"
+                                   @onchange="e => RenameSfx(sfxIndex, sfxName, e.Value?.ToString())" />
+                            <button type="button" class="btn-delete-item"
+                                    @onclick="() => RemoveSfx(sfxIndex)" title="Remove SFX">✕</button>
+                        </div>
+                        <div class="desc-edit-row">
+                            <textarea class="form-control desc-textarea"
+                                      rows="2"
+                                      placeholder="SFX rule description..."
+                                      value="@currentDesc"
+                                      @onchange="e => UpdateSfxDescription(sfxName, e.Value?.ToString())"></textarea>
+                        </div>
+                    </div>
+                }
+                <div class="add-with-select-row">
+                    <select class="form-select sfx-picker-select" @bind="selectedNewSfxKey">
+                        <option value="">-- Choose SFX to add --</option>
+                        @foreach (var opt in LibraryService.GetSfxPickerOptions())
+                        {
+                            <option value="@opt.Key">@opt.DisplayName</option>
+                        }
+                    </select>
+                    <button type="button" class="btn-add-mini" @onclick="AddSelectedSfx">+ Add SFX</button>
+                </div>
+            </div>
+        }
+        else if (PowerSet.Sfx != null && PowerSet.Sfx.Count > 0)
+        {
+            <div class="sfx-items">
+                @foreach (var sfx in PowerSet.Sfx)
+                {
+                    <div class="sfx-item">
+                        <span class="sfx-tag">SFX</span>
+                        <div class="sfx-content">
+                            <strong class="sfx-name">@sfx:</strong>
+                            <span class="sfx-desc">@LibraryService.GetSfxDescription(sfx, Hero)</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Limits Section -->
+    <div class="limits-section">
+        <span class="section-micro-header">LIMITS</span>
+        @if (IsEditMode)
+        {
+            <div class="limits-edit-list">
+                @for (int i = 0; i < PowerSet.Limits.Count; i++)
+                {
+                    var limitIndex = i;
+                    var limitName = PowerSet.Limits[limitIndex];
+                    var currentDesc = LibraryService.GetLimitDescription(limitName, Hero);
+
+                    <div class="limit-edit-block">
+                        <div class="limit-edit-row">
+                            <span class="limit-tag">LIMIT</span>
+                            <input type="text" class="form-control limit-input"
+                                   value="@limitName"
+                                   placeholder="Limit Name"
+                                   @onchange="e => RenameLimit(limitIndex, limitName, e.Value?.ToString())" />
+                            <button type="button" class="btn-delete-item"
+                                    @onclick="() => RemoveLimit(limitIndex)" title="Remove Limit">✕</button>
+                        </div>
+                        <div class="desc-edit-row">
+                            <textarea class="form-control desc-textarea"
+                                      rows="2"
+                                      placeholder="Limit rule description..."
+                                      value="@currentDesc"
+                                      @onchange="e => UpdateLimitDescription(limitName, e.Value?.ToString())"></textarea>
+                        </div>
+                    </div>
+                }
+                <div class="add-with-select-row">
+                    <select class="form-select limit-picker-select" @bind="selectedNewLimitKey">
+                        <option value="">-- Choose Limit to add --</option>
+                        @foreach (var opt in LibraryService.GetLimitPickerOptions())
+                        {
+                            <option value="@opt.Key">@opt.DisplayName</option>
+                        }
+                    </select>
+                    <button type="button" class="btn-add-mini" @onclick="AddSelectedLimit">+ Add Limit</button>
+                </div>
+            </div>
+        }
+        else if (PowerSet.Limits != null && PowerSet.Limits.Count > 0)
+        {
+            <div class="limit-items">
+                @foreach (var limit in PowerSet.Limits)
+                {
+                    <div class="limit-item">
+                        <span class="limit-tag">LIMIT</span>
+                        <div class="limit-content">
+                            <strong class="limit-name">@limit:</strong>
+                            <span class="limit-desc">@LibraryService.GetLimitDescription(limit, Hero)</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Power Suggestions Datalist -->
+    <datalist id="power-suggestions">
+        @foreach (var p in CortexRulesData.PredefinedPowers)
+        {
+            <option value="@p"></option>
+        }
+    </datalist>
+</div>
+
+@code {
+    [Parameter] public PowerSetModel PowerSet { get; set; } = new();
+    [Parameter] public HeroModel? Hero { get; set; }
+    [Parameter] public int Index { get; set; } = 1;
+    [Parameter] public bool IsEditMode { get; set; } = false;
+    [Parameter] public EventCallback OnDeletePowerSet { get; set; }
+
+    private string selectedNewSfxKey = "";
+    private string selectedNewLimitKey = "";
+
+    private void AddPower()
+    {
+        PowerSet.Powers.Add(new RatedTraitModel { Name = "New Power", Rating = 8 });
+    }
+
+    private void RemovePower(int index)
+    {
+        if (index >= 0 && index < PowerSet.Powers.Count)
+        {
+            PowerSet.Powers.RemoveAt(index);
+        }
+    }
+
+    private void RenameSfx(int index, string oldName, string? newName)
+    {
+        if (index >= 0 && index < PowerSet.Sfx.Count && !string.IsNullOrWhiteSpace(newName))
+        {
+            PowerSet.Sfx[index] = newName.Trim();
+            if (Hero != null && Hero.CustomSfxDescriptions.TryGetValue(oldName, out var desc))
+            {
+                Hero.CustomSfxDescriptions.Remove(oldName);
+                Hero.CustomSfxDescriptions[newName.Trim()] = desc;
+            }
+        }
+    }
+
+    private async Task UpdateSfxDescription(string sfxName, string? desc)
+    {
+        if (!string.IsNullOrWhiteSpace(sfxName) && desc != null)
+        {
+            if (Hero != null)
+            {
+                Hero.CustomSfxDescriptions[sfxName] = desc;
+            }
+            await LibraryService.SaveCustomSfxAsync(sfxName, desc);
+        }
+    }
+
+    private void AddSelectedSfx()
+    {
+        if (!string.IsNullOrWhiteSpace(selectedNewSfxKey) && !PowerSet.Sfx.Contains(selectedNewSfxKey))
+        {
+            PowerSet.Sfx.Add(selectedNewSfxKey);
+            selectedNewSfxKey = "";
+        }
+    }
+
+    private void RemoveSfx(int index)
+    {
+        if (index >= 0 && index < PowerSet.Sfx.Count)
+        {
+            PowerSet.Sfx.RemoveAt(index);
+        }
+    }
+
+    private void RenameLimit(int index, string oldName, string? newName)
+    {
+        if (index >= 0 && index < PowerSet.Limits.Count && !string.IsNullOrWhiteSpace(newName))
+        {
+            PowerSet.Limits[index] = newName.Trim();
+            if (Hero != null && Hero.CustomLimitDescriptions.TryGetValue(oldName, out var desc))
+            {
+                Hero.CustomLimitDescriptions.Remove(oldName);
+                Hero.CustomLimitDescriptions[newName.Trim()] = desc;
+            }
+        }
+    }
+
+    private async Task UpdateLimitDescription(string limitName, string? desc)
+    {
+        if (!string.IsNullOrWhiteSpace(limitName) && desc != null)
+        {
+            if (Hero != null)
+            {
+                Hero.CustomLimitDescriptions[limitName] = desc;
+            }
+            await LibraryService.SaveCustomLimitAsync(limitName, desc);
+        }
+    }
+
+    private void AddSelectedLimit()
+    {
+        if (!string.IsNullOrWhiteSpace(selectedNewLimitKey) && !PowerSet.Limits.Contains(selectedNewLimitKey))
+        {
+            PowerSet.Limits.Add(selectedNewLimitKey);
+            selectedNewLimitKey = "";
+        }
+    }
+
+    private void RemoveLimit(int index)
+    {
+        if (index >= 0 && index < PowerSet.Limits.Count)
+        {
+            PowerSet.Limits.RemoveAt(index);
+        }
+    }
+}

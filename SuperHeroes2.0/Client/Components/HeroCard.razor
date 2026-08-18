@@ -1,0 +1,356 @@
+@using SuperHeroes.Client.Models
+@using SuperHeroes.Client.Services
+@inject HeroApiService HeroService
+@inject CustomLibraryService LibraryService
+@inject IJSRuntime JSRuntime
+
+<div class="hero-datasheet glass-card @(Hero.IsFavorite ? "is-favorite-hero" : "") @(isEditMode ? "datasheet-editing" : "")">
+    <!-- Header Banner: Left Identity / Distinctions, Right 2x2 Action Grid -->
+    <div class="hero-header-banner">
+        <div class="hero-header-left">
+            @if (isEditMode)
+            {
+                <div class="hero-identity-edit-grid">
+                    <div class="edit-field-group">
+                        <label class="edit-label">Hero / Codename</label>
+                        <input type="text" class="form-control hero-name-input"
+                               placeholder="Hero Codename"
+                               @bind="Hero.HeroName" />
+                    </div>
+                    <div class="edit-field-group">
+                        <label class="edit-label">Player Name</label>
+                        <input type="text" class="form-control"
+                               placeholder="Player Name"
+                               @bind="Hero.PlayerName" />
+                    </div>
+                    <div class="edit-field-group">
+                        <label class="edit-label">Secret Identity / Real Name</label>
+                        <input type="text" class="form-control"
+                               placeholder="Secret Identity"
+                               @bind="Hero.SecretIdentity" />
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="hero-codename-row">
+                    <h2 class="hero-codename">@Hero.GetDisplayName()</h2>
+                    @if (Hero.ProdigyEnabled)
+                    {
+                        <span class="prodigy-badge" title="Prodigy rules enabled">PRODIGY</span>
+                    }
+                </div>
+                @if (!string.IsNullOrWhiteSpace(Hero.SecretIdentity) || !string.IsNullOrWhiteSpace(Hero.PlayerName))
+                {
+                    <div class="hero-subidentity-row">
+                        @if (!string.IsNullOrWhiteSpace(Hero.SecretIdentity))
+                        {
+                            <span class="identity-tag"><span class="tag-lbl">Secret ID:</span> @Hero.SecretIdentity</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Hero.PlayerName))
+                        {
+                            <span class="identity-tag"><span class="tag-lbl">Player:</span> @Hero.PlayerName</span>
+                        }
+                    </div>
+                }
+            }
+
+            <!-- Distinctions (d8) -->
+            <div class="distinctions-wrapper">
+                <span class="section-micro-header">DISTINCTIONS (d8)</span>
+                <div class="hero-distinctions-strip">
+                    @for (int i = 0; i < Hero.Distinctions.Count; i++)
+                    {
+                        var distIndex = i;
+                        @if (isEditMode)
+                        {
+                            <div class="distinction-edit-chip">
+                                <CortexDice Die="8" Size="small" />
+                                <input type="text" class="form-control distinction-input"
+                                       value="@Hero.Distinctions[distIndex]"
+                                       @onchange="e => UpdateDistinction(distIndex, e.Value?.ToString())" />
+                            </div>
+                        }
+                        else
+                        {
+                            <span class="distinction-tag">
+                                <CortexDice Die="8" Size="small" />
+                                <span class="distinction-text">@Hero.Distinctions[distIndex]</span>
+                            </span>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Pinned Top-Right 2x2 Action Button Grid -->
+        <div class="hero-header-actions-2x2">
+            <button type="button" class="btn-action-tile btn-edit-toggle @(isEditMode ? "btn-edit-active" : "")"
+                    @onclick="ToggleEditMode" title="Toggle Hero Editor">
+                @(isEditMode ? "✓ Done" : "✏️ Edit")
+            </button>
+            <button type="button" class="btn-action-tile @(Hero.IsFavorite ? "favorited" : "")"
+                    @onclick="ToggleFavorite" title="Bookmark Hero">
+                @(Hero.IsFavorite ? "★ Saved" : "☆ Save")
+            </button>
+            <button type="button" class="btn-action-tile" @onclick="CopyDiscordMarkdown" title="Copy Discord Markdown">
+                @(copiedDiscord ? "✓ Copied!" : "📋 Discord")
+            </button>
+            <button type="button" class="btn-action-tile" @onclick="DownloadJson" title="Export JSON">
+                💾 JSON
+            </button>
+        </div>
+    </div>
+
+    <!-- Affiliations & Specialties Row -->
+    <div class="hero-core-stats-grid">
+        <!-- Affiliations -->
+        <div class="core-stat-card affiliations-card">
+            <h4 class="stat-card-title">AFFILIATIONS</h4>
+            <div class="affiliations-list">
+                @foreach (var affil in Hero.Affiliations)
+                {
+                    <div class="affiliation-item">
+                        <span class="affil-label">@affil.Name</span>
+                        @if (isEditMode)
+                        {
+                            <div class="affil-edit-controls">
+                                <select class="form-select die-select" @bind="affil.Rating">
+                                    @foreach (var d in CortexRulesData.AvailableDice)
+                                    {
+                                        <option value="@d">d@(d)</option>
+                                    }
+                                </select>
+                                <CortexDice Die="@affil.Rating" Size="medium" Interactive="true"
+                                            DieChanged="newDie => affil.Rating = newDie" />
+                            </div>
+                        }
+                        else
+                        {
+                            <CortexDice Die="@affil.Rating" Size="medium" />
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Specialties -->
+        <div class="core-stat-card specialties-card">
+            <div class="card-title-row">
+                <h4 class="stat-card-title">SPECIALTIES</h4>
+                @if (isEditMode)
+                {
+                    <button type="button" class="btn-add-mini" @onclick="AddSpecialty">+ Add</button>
+                }
+            </div>
+            <div class="specialties-list @(isEditMode ? "specialties-edit-list" : "")">
+                @for (int i = 0; i < Hero.Specialties.Count; i++)
+                {
+                    var specIndex = i;
+                    var spec = Hero.Specialties[specIndex];
+                    @if (isEditMode)
+                    {
+                        <div class="specialty-edit-row">
+                            <input type="text" list="specialty-suggestions" class="form-control spec-input"
+                                   placeholder="Specialty Name" @bind="spec.Name" />
+                            <select class="form-select die-select" @bind="spec.Rating">
+                                @foreach (var d in CortexRulesData.AvailableDice)
+                                {
+                                    <option value="@d">d@(d)</option>
+                                }
+                            </select>
+                            <CortexDice Die="@spec.Rating" Size="small" />
+                            <button type="button" class="btn-delete-item"
+                                    @onclick="() => RemoveSpecialty(specIndex)" title="Remove Specialty">✕</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="specialty-chip">
+                            <span class="specialty-name">@spec.Name</span>
+                            <CortexDice Die="@spec.Rating" Size="small" />
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Power Sets Section -->
+    <div class="hero-powers-section">
+        <div class="section-title-bar">
+            <h3 class="section-title">⚡ POWER SETS</h3>
+            @if (isEditMode)
+            {
+                <button type="button" class="btn-add-section" @onclick="AddPowerSet">+ Add Power Set</button>
+            }
+        </div>
+        @if (Hero.PowerSets != null && Hero.PowerSets.Count > 0)
+        {
+            <div class="powersets-container">
+                @for (int i = 0; i < Hero.PowerSets.Count; i++)
+                {
+                    var psIndex = i;
+                    <PowerSetCard PowerSet="@Hero.PowerSets[psIndex]"
+                                  Hero="@Hero"
+                                  Index="@(psIndex + 1)"
+                                  IsEditMode="@isEditMode"
+                                  OnDeletePowerSet="() => RemovePowerSet(psIndex)" />
+                }
+            </div>
+        }
+        else if (isEditMode)
+        {
+            <div class="empty-edit-placeholder">No Power Sets. Click "+ Add Power Set" to create one.</div>
+        }
+    </div>
+
+    <!-- Milestones Section -->
+    <div class="hero-milestones-section">
+        <div class="section-title-bar">
+            <h3 class="section-title">🏆 MILESTONES</h3>
+            @if (isEditMode)
+            {
+                <div class="add-with-select-row">
+                    <select class="form-select milestone-picker-select" @bind="selectedNewMilestoneKey">
+                        <option value="">-- Choose Milestone to Add --</option>
+                        @foreach (var opt in LibraryService.GetMilestonePickerOptions())
+                        {
+                            <option value="@opt.Key">@opt.DisplayName</option>
+                        }
+                    </select>
+                    <button type="button" class="btn-add-section" @onclick="AddSelectedMilestone">+ Add Milestone</button>
+                </div>
+            }
+        </div>
+        @if (Hero.Milestones != null && Hero.Milestones.Count > 0)
+        {
+            <div class="milestones-container">
+                @for (int i = 0; i < Hero.Milestones.Count; i++)
+                {
+                    var mIndex = i;
+                    <MilestoneCard MilestoneName="@Hero.Milestones[mIndex]"
+                                   Hero="@Hero"
+                                   IsEditMode="@isEditMode"
+                                   OnMilestoneChanged="newVal => Hero.Milestones[mIndex] = newVal"
+                                   OnDeleteMilestone="() => RemoveMilestone(mIndex)" />
+                }
+            </div>
+        }
+        else if (isEditMode)
+        {
+            <div class="empty-edit-placeholder">No Milestones. Choose a milestone above to add one.</div>
+        }
+    </div>
+
+    <!-- Suggestions Datalist -->
+    <datalist id="specialty-suggestions">
+        @foreach (var s in CortexRulesData.PredefinedSpecialties)
+        {
+            <option value="@s"></option>
+        }
+    </datalist>
+</div>
+
+@code {
+    [Parameter] public HeroModel Hero { get; set; } = new();
+    [Parameter] public EventCallback<HeroModel> OnHeroUpdated { get; set; }
+
+    private bool isEditMode = false;
+    private bool copiedDiscord = false;
+    private string selectedNewMilestoneKey = "";
+
+    private void ToggleEditMode()
+    {
+        isEditMode = !isEditMode;
+        if (!isEditMode)
+        {
+            OnHeroUpdated.InvokeAsync(Hero);
+        }
+    }
+
+    private void UpdateDistinction(int index, string? name)
+    {
+        if (index >= 0 && index < Hero.Distinctions.Count && !string.IsNullOrWhiteSpace(name))
+        {
+            Hero.Distinctions[index] = name.Trim();
+        }
+    }
+
+    private void AddSpecialty()
+    {
+        Hero.Specialties.Add(new RatedTraitModel { Name = "Combat", Rating = 8 });
+    }
+
+    private void RemoveSpecialty(int index)
+    {
+        if (index >= 0 && index < Hero.Specialties.Count)
+        {
+            Hero.Specialties.RemoveAt(index);
+        }
+    }
+
+    private void AddPowerSet()
+    {
+        Hero.PowerSets.Add(new PowerSetModel
+        {
+            Name = $"Power Set {Hero.PowerSets.Count + 1}",
+            Powers = new List<RatedTraitModel>
+            {
+                new() { Name = "Superhuman Strength", Rating = 10 },
+                new() { Name = "Superhuman Durability", Rating = 8 }
+            },
+            Sfx = new List<string> { "Burst" },
+            Limits = new List<string> { "Exhausted" }
+        });
+    }
+
+    private void RemovePowerSet(int index)
+    {
+        if (index >= 0 && index < Hero.PowerSets.Count)
+        {
+            Hero.PowerSets.RemoveAt(index);
+        }
+    }
+
+    private void AddSelectedMilestone()
+    {
+        if (!string.IsNullOrWhiteSpace(selectedNewMilestoneKey) && !Hero.Milestones.Contains(selectedNewMilestoneKey))
+        {
+            Hero.Milestones.Add(selectedNewMilestoneKey);
+            selectedNewMilestoneKey = "";
+        }
+    }
+
+    private void RemoveMilestone(int index)
+    {
+        if (index >= 0 && index < Hero.Milestones.Count)
+        {
+            Hero.Milestones.RemoveAt(index);
+        }
+    }
+
+    private async Task ToggleFavorite()
+    {
+        await HeroService.ToggleFavoriteAsync(Hero);
+        await OnHeroUpdated.InvokeAsync(Hero);
+    }
+
+    private async Task CopyDiscordMarkdown()
+    {
+        var markdown = HeroService.GenerateDiscordMarkdown(Hero);
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", markdown);
+        copiedDiscord = true;
+        StateHasChanged();
+        await Task.Delay(2000);
+        copiedDiscord = false;
+        StateHasChanged();
+    }
+
+    private async Task DownloadJson()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(Hero, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        var fileName = $"hero-{Hero.GetDisplayName().ToLower().Replace(' ', '-')}.json";
+        await JSRuntime.InvokeVoidAsync("downloadFileBlob", fileName, "application/json", json);
+    }
+}

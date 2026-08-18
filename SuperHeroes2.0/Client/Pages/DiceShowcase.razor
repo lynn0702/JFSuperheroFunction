@@ -1,0 +1,409 @@
+@page "/dice"
+@using SuperHeroes.Client.Models
+@using SuperHeroes.Client.Services
+@using SuperHeroes.Client.Components
+@inject DiceThemeService ThemeService
+
+<PageTitle>Cortex Dice Testbench | heroes.lynnjones.rocks</PageTitle>
+
+<div class="dice-showcase-page">
+    <div class="generator-controls-bar glass-panel">
+        <div class="hero-brand">
+            <h1 class="brand-title">CORTEX SVG DICE TESTBENCH</h1>
+            <p class="brand-sub">Test and customize SVG vector dice (d2, d4, d6, d8, d10, d12) with real-time color picking, interactive stepped scaling, and strategy-aware pool roller.</p>
+        </div>
+    </div>
+
+    <!-- Theme Customizer -->
+    <DiceColorSelector />
+
+    <!-- Interactive Stepper Playground -->
+    <div class="testbench-section glass-panel">
+        <h3 class="section-title">🎲 Interactive Stepper Dice</h3>
+        <p class="section-desc">Click any die to step up (d2 → d4 → d6 → d8 → d10 → d12), or right-click to step down. Use arrow steppers for precision.</p>
+
+        <div class="steppers-grid">
+            <div class="stepper-box">
+                <span class="stepper-label">Small Stepper</span>
+                <AdvancedCortexDice @bind-Die="demoDie1" Size="small" />
+                <span class="stepper-rating">d@(demoDie1)</span>
+            </div>
+
+            <div class="stepper-box">
+                <span class="stepper-label">Medium Stepper</span>
+                <AdvancedCortexDice @bind-Die="demoDie2" Size="medium" />
+                <span class="stepper-rating">d@(demoDie2)</span>
+            </div>
+
+            <div class="stepper-box">
+                <span class="stepper-label">Large Stepper</span>
+                <AdvancedCortexDice @bind-Die="demoDie3" Size="large" />
+                <span class="stepper-rating">d@(demoDie3)</span>
+            </div>
+
+            <div class="stepper-box">
+                <span class="stepper-label">Extra Large</span>
+                <AdvancedCortexDice @bind-Die="demoDie4" Size="xlarge" />
+                <span class="stepper-rating">d@(demoDie4)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Full Polyhedral Tier Grid -->
+    <div class="testbench-section glass-panel">
+        <h3 class="section-title">✨ Complete Cortex Polyhedral Range</h3>
+        <div class="polyhedral-tier-grid">
+            <div class="tier-card">
+                <CortexDice Die="2" Size="large" />
+                <h4>d2</h4>
+                <span class="tier-name">Binary / Catalyst</span>
+            </div>
+
+            <div class="tier-card">
+                <CortexDice Die="4" Size="large" />
+                <h4>d4</h4>
+                <span class="tier-name">Complication / Weakness</span>
+            </div>
+
+            <div class="tier-card">
+                <CortexDice Die="6" Size="large" />
+                <h4>d6</h4>
+                <span class="tier-name">Standard Trait</span>
+            </div>
+
+            <div class="tier-card">
+                <CortexDice Die="8" Size="large" />
+                <h4>d8</h4>
+                <span class="tier-name">Expert Trait / Distinction</span>
+            </div>
+
+            <div class="tier-card">
+                <CortexDice Die="10" Size="large" />
+                <h4>d10</h4>
+                <span class="tier-name">Master Trait / Primary Power</span>
+            </div>
+
+            <div class="tier-card">
+                <CortexDice Die="12" Size="large" />
+                <h4>d12</h4>
+                <span class="tier-name">Godlike Trait / Apex Power</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dice Pool Simulator -->
+    <div class="testbench-section glass-panel">
+        <h3 class="section-title">⚡ Interactive Dice Pool Roller</h3>
+        <p class="section-desc">Build your Cortex dice pool, configure roll conditions (Dangerous hitches, Best Total vs. Best Effect strategy), and roll!</p>
+
+        <!-- Roller Settings Bar -->
+        <div class="roller-config-bar">
+            <div class="config-group">
+                <span class="config-label">Roll Strategy:</span>
+                <div class="strategy-toggle-buttons">
+                    <button type="button" class="btn-strategy @(rollStrategy == RollStrategy.BestTotal ? "active" : "")"
+                            @onclick="() => SetStrategy(RollStrategy.BestTotal)">
+                        🏆 Best Total (Highest Sum)
+                    </button>
+                    <button type="button" class="btn-strategy @(rollStrategy == RollStrategy.BestEffect ? "active" : "")"
+                            @onclick="() => SetStrategy(RollStrategy.BestEffect)">
+                        💥 Best Effect (Largest Die)
+                    </button>
+                </div>
+            </div>
+
+            <div class="config-group">
+                <label class="dangerous-toggle-label">
+                    <input type="checkbox" class="form-check-input" @bind="isDangerous" @bind:after="RecalculateOutcome" />
+                    <span class="dangerous-text">⚠️ <strong>Dangerous</strong> (Hitches on 1s & 2s)</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="pool-builder">
+            <div class="pool-buttons">
+                <button class="btn-add-die" @onclick="() => AddDieToPool(4)">+ d4</button>
+                <button class="btn-add-die" @onclick="() => AddDieToPool(6)">+ d6</button>
+                <button class="btn-add-die" @onclick="() => AddDieToPool(8)">+ d8</button>
+                <button class="btn-add-die" @onclick="() => AddDieToPool(10)">+ d10</button>
+                <button class="btn-add-die" @onclick="() => AddDieToPool(12)">+ d12</button>
+                <button class="btn-clear-pool" @onclick="ClearPool">Clear Pool</button>
+            </div>
+
+            <div class="active-pool-tray">
+                @if (dicePool.Count == 0)
+                {
+                    <span class="empty-pool-text">Dice pool is empty. Click buttons above to add dice!</span>
+                }
+                else
+                {
+                    @foreach (var (die, index) in dicePool.Select((d, i) => (d, i)))
+                    {
+                        var isDieHitch = IsHitch(die);
+                        var isTotalDie = selectedTotalDice.Contains(die);
+                        var isEffectDie = selectedEffectDie == die;
+
+                        <div class="pool-die-item @(isTotalDie ? "die-in-total" : "") @(isEffectDie ? "die-in-effect" : "")"
+                             @onclick="() => RemoveDieFromPool(index)" title="Click to remove">
+                            <CortexDice Die="@die.Size" Size="medium" />
+                            @if (hasRolled)
+                            {
+                                <span class="roll-result-badge @(isDieHitch ? "is-hitch" : "")">
+                                    @(isDieHitch ? $"⚠️ {die.Result}" : die.Result.ToString())
+                                </span>
+                                @if (isTotalDie)
+                                {
+                                    <span class="role-tag role-total">Total</span>
+                                }
+                                else if (isEffectDie)
+                                {
+                                    <span class="role-tag role-effect">Effect</span>
+                                }
+                            }
+                        </div>
+                    }
+                }
+            </div>
+
+            <div class="pool-roll-actions">
+                <button class="btn-roll-pool pulse-glow" @onclick="RollPool" disabled="@(dicePool.Count == 0)">
+                    🎲 ROLL DICE POOL
+                </button>
+
+                @if (hasRolled && dicePool.Count > 0)
+                {
+                    <div class="roll-summary-card">
+                        <div class="summary-metric">
+                            <span class="metric-label">TOTAL (Best 2)</span>
+                            <span class="metric-val text-primary">@poolTotal</span>
+                            <span class="metric-sub">Sum of dice</span>
+                        </div>
+                        <div class="summary-metric">
+                            <span class="metric-label">EFFECT DIE</span>
+                            <span class="metric-val text-accent">d@(poolEffectDie)</span>
+                            <span class="metric-sub">Trait intensity</span>
+                        </div>
+                        <div class="summary-metric">
+                            <span class="metric-label">HITCHES @(isDangerous ? "(1s & 2s)" : "(1s)")</span>
+                            <span class="metric-val @(hitchesCount > 0 ? "text-danger" : "")">@hitchesCount</span>
+                            <span class="metric-sub">Opportunities for GM</span>
+                        </div>
+                    </div>
+
+                    <!-- Comparison breakdown -->
+                    <div class="strategy-comparison-grid">
+                        <div class="comparison-card @(rollStrategy == RollStrategy.BestTotal ? "active-strategy" : "")">
+                            <div class="comp-header">🏆 Best Total Allocation</div>
+                            <div class="comp-body">
+                                <span>Total: <strong>@bestTotalResult.Total</strong></span>
+                                <span>Effect Die: <strong>d@(bestTotalResult.EffectDie)</strong></span>
+                            </div>
+                        </div>
+                        <div class="comparison-card @(rollStrategy == RollStrategy.BestEffect ? "active-strategy" : "")">
+                            <div class="comp-header">💥 Best Effect Allocation</div>
+                            <div class="comp-body">
+                                <span>Total: <strong>@bestEffectResult.Total</strong></span>
+                                <span>Effect Die: <strong>d@(bestEffectResult.EffectDie)</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private enum RollStrategy
+    {
+        BestTotal,
+        BestEffect
+    }
+
+    private class PoolDie
+    {
+        public int Id { get; set; } = Random.Shared.Next(1, 1000000);
+        public int Size { get; set; }
+        public int Result { get; set; }
+    }
+
+    private class AllocationResult
+    {
+        public int Total { get; set; }
+        public int EffectDie { get; set; } = 4;
+        public List<PoolDie> TotalDice { get; set; } = new();
+        public PoolDie? EffectDieItem { get; set; }
+    }
+
+    private int demoDie1 = 4;
+    private int demoDie2 = 6;
+    private int demoDie3 = 8;
+    private int demoDie4 = 10;
+
+    private List<PoolDie> dicePool = new()
+    {
+        new() { Size = 8 },
+        new() { Size = 8 },
+        new() { Size = 10 },
+        new() { Size = 6 }
+    };
+
+    private bool hasRolled = false;
+    private bool isDangerous = false;
+    private RollStrategy rollStrategy = RollStrategy.BestTotal;
+
+    private int poolTotal = 0;
+    private int poolEffectDie = 4;
+    private int hitchesCount = 0;
+    private List<PoolDie> selectedTotalDice = new();
+    private PoolDie? selectedEffectDie = null;
+
+    private AllocationResult bestTotalResult = new();
+    private AllocationResult bestEffectResult = new();
+
+    private bool IsHitch(PoolDie die)
+    {
+        if (die.Result <= 0) return false;
+        return isDangerous ? (die.Result == 1 || die.Result == 2) : (die.Result == 1);
+    }
+
+    private void SetStrategy(RollStrategy strategy)
+    {
+        rollStrategy = strategy;
+        ApplyChosenStrategy();
+    }
+
+    private void AddDieToPool(int size)
+    {
+        dicePool.Add(new PoolDie { Size = size });
+        hasRolled = false;
+    }
+
+    private void RemoveDieFromPool(int index)
+    {
+        if (index >= 0 && index < dicePool.Count)
+        {
+            dicePool.RemoveAt(index);
+            hasRolled = false;
+        }
+    }
+
+    private void ClearPool()
+    {
+        dicePool.Clear();
+        hasRolled = false;
+    }
+
+    private void RollPool()
+    {
+        if (dicePool.Count == 0) return;
+
+        foreach (var die in dicePool)
+        {
+            die.Result = Random.Shared.Next(1, die.Size + 1);
+        }
+
+        hasRolled = true;
+        RecalculateOutcome();
+    }
+
+    private void RecalculateOutcome()
+    {
+        if (!hasRolled || dicePool.Count == 0) return;
+
+        hitchesCount = dicePool.Count(IsHitch);
+        var validDice = dicePool.Where(d => !IsHitch(d)).ToList();
+
+        // 1. Calculate Best Total Strategy
+        bestTotalResult = CalculateBestTotal(validDice);
+
+        // 2. Calculate Best Effect Strategy
+        bestEffectResult = CalculateBestEffect(validDice);
+
+        ApplyChosenStrategy();
+    }
+
+    private void ApplyChosenStrategy()
+    {
+        var chosen = rollStrategy == RollStrategy.BestTotal ? bestTotalResult : bestEffectResult;
+        poolTotal = chosen.Total;
+        poolEffectDie = chosen.EffectDie;
+        selectedTotalDice = chosen.TotalDice;
+        selectedEffectDie = chosen.EffectDieItem;
+    }
+
+    private AllocationResult CalculateBestTotal(List<PoolDie> validDice)
+    {
+        var res = new AllocationResult();
+        if (validDice.Count == 0)
+        {
+            res.Total = 0;
+            res.EffectDie = 4;
+            return res;
+        }
+
+        var sortedByRoll = validDice.OrderByDescending(d => d.Result).ToList();
+        if (sortedByRoll.Count >= 2)
+        {
+            res.TotalDice = sortedByRoll.Take(2).ToList();
+            res.Total = res.TotalDice.Sum(d => d.Result);
+
+            var remaining = sortedByRoll.Skip(2).OrderByDescending(d => d.Size).ToList();
+            if (remaining.Count > 0)
+            {
+                res.EffectDieItem = remaining[0];
+                res.EffectDie = remaining[0].Size;
+            }
+            else
+            {
+                res.EffectDie = 4;
+            }
+        }
+        else
+        {
+            res.TotalDice = sortedByRoll.Take(1).ToList();
+            res.Total = res.TotalDice[0].Result;
+            res.EffectDie = 4;
+        }
+        return res;
+    }
+
+    private AllocationResult CalculateBestEffect(List<PoolDie> validDice)
+    {
+        var res = new AllocationResult();
+        if (validDice.Count == 0)
+        {
+            res.Total = 0;
+            res.EffectDie = 4;
+            return res;
+        }
+
+        if (validDice.Count == 1)
+        {
+            res.TotalDice = validDice;
+            res.Total = validDice[0].Result;
+            res.EffectDie = 4;
+            return res;
+        }
+
+        if (validDice.Count == 2)
+        {
+            res.TotalDice = validDice;
+            res.Total = validDice.Sum(d => d.Result);
+            res.EffectDie = 4;
+            return res;
+        }
+
+        // Count >= 3: Pick the single largest die as effect die, then best 2 from remainder
+        var sortedBySize = validDice.OrderByDescending(d => d.Size).ThenBy(d => d.Result).ToList();
+        var effectCandidate = sortedBySize[0];
+        res.EffectDieItem = effectCandidate;
+        res.EffectDie = effectCandidate.Size;
+
+        var remainder = validDice.Where(d => d != effectCandidate).OrderByDescending(d => d.Result).ToList();
+        res.TotalDice = remainder.Take(2).ToList();
+        res.Total = res.TotalDice.Sum(d => d.Result);
+
+        return res;
+    }
+}

@@ -1,0 +1,180 @@
+@page "/"
+@using SuperHeroes.Client.Models
+@using SuperHeroes.Client.Services
+@using SuperHeroes.Client.Components
+@inject HeroApiService HeroService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Cortex Superhero Generator 2.0 | heroes.lynnjones.rocks</PageTitle>
+
+<div class="hero-generator-page">
+    <!-- Top Action Hub -->
+    <div class="generator-controls-bar glass-panel">
+        <div class="hero-brand">
+            <h1 class="brand-title">CORTEX HERO GENERATOR <span class="version-tag">2.0</span></h1>
+            <p class="brand-sub">Algorithmic Cortex Prime superheroes powered by Jeremy Forbing's generation procedure.</p>
+        </div>
+
+        <div class="main-cta-group">
+            <button class="btn-generate-hero pulse-glow" @onclick="GenerateNewHero" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <span>@(isColdStarting ? "Warming up Azure Serverless..." : "Rolling Traits...")</span>
+                }
+                else
+                {
+                    <span class="cta-icon">🎲</span>
+                    <span class="cta-text">GENERATE HERO</span>
+                }
+            </button>
+
+            <button class="btn-secondary-action" @onclick="ToggleFavoritesDrawer">
+                ⭐ Saved Heroes (@favoriteCount)
+            </button>
+        </div>
+    </div>
+
+    <!-- Live Dice Theme Selector -->
+    <DiceColorSelector />
+
+    <!-- Loading Skeleton / Cold Start Banner -->
+    @if (isLoading)
+    {
+        <div class="loading-state-card glass-card">
+            <div class="coldstart-spinner">
+                <div class="spinning-dice">
+                    <CortexDice Die="10" Size="large" />
+                </div>
+                <h3 class="loading-heading">Constructing Superhero Traits...</h3>
+                <p class="loading-msg">
+                    @if (isColdStarting)
+                    {
+                        <span>Connecting to Azure Consumption Function. If server was idle, spin-up takes ~3–4 seconds.</span>
+                    }
+                    else
+                    {
+                        <span>Rolling distinctions, power sets, SFX, and milestones...</span>
+                    }
+                </p>
+            </div>
+        </div>
+    }
+    else if (currentHero != null)
+    {
+        <!-- Render Current Hero Sheet -->
+        <HeroCard Hero="@currentHero" OnHeroUpdated="HandleHeroUpdated" />
+    }
+
+    <!-- Favorites Drawer Modal -->
+    @if (showFavoritesDrawer)
+    {
+        <div class="modal-backdrop" @onclick="ToggleFavoritesDrawer">
+            <div class="favorites-drawer glass-panel" @onclick:stopPropagation="true">
+                <div class="drawer-header">
+                    <h3>⭐ Bookmarked Superheroes</h3>
+                    <button class="btn-close-drawer" @onclick="ToggleFavoritesDrawer">✕</button>
+                </div>
+
+                <div class="drawer-body">
+                    @if (favoriteHeroes.Count == 0)
+                    {
+                        <p class="empty-fav-msg">No heroes bookmarked yet! Click "☆ Save" on any generated hero sheet to keep them here.</p>
+                    }
+                    else
+                    {
+                        <div class="fav-list">
+                            @foreach (var fav in favoriteHeroes)
+                            {
+                                <div class="fav-item-row" @onclick="() => LoadFavorite(fav)">
+                                    <div class="fav-identity">
+                                        <strong>@fav.GetDisplayName()</strong>
+                                        <span class="fav-date">@fav.CreatedAt.ToString("MMM d, yyyy")</span>
+                                    </div>
+                                    <button class="btn-remove-fav" @onclick="() => RemoveFavorite(fav)" @onclick:stopPropagation="true" title="Remove">✕</button>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private HeroModel? currentHero;
+    private bool isLoading = false;
+    private bool isColdStarting = false;
+    private bool showFavoritesDrawer = false;
+    private List<HeroModel> favoriteHeroes = new();
+    private int favoriteCount => favoriteHeroes.Count;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFavoritesList();
+        await GenerateNewHero();
+    }
+
+    private async Task LoadFavoritesList()
+    {
+        favoriteHeroes = await HeroService.GetFavoritesAsync();
+    }
+
+    private async Task GenerateNewHero()
+    {
+        if (isLoading) return;
+        isLoading = true;
+        isColdStarting = false;
+
+        // Set cold start message if takes longer than 1.5s
+        var timer = Task.Delay(1500).ContinueWith(_ =>
+        {
+            if (isLoading)
+            {
+                isColdStarting = true;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        try
+        {
+            currentHero = await HeroService.GenerateHeroAsync();
+            if (currentHero != null)
+            {
+                currentHero.IsFavorite = favoriteHeroes.Any(f => f.Distinctions.SequenceEqual(currentHero.Distinctions));
+            }
+        }
+        finally
+        {
+            isLoading = false;
+            isColdStarting = false;
+        }
+    }
+
+    private async Task HandleHeroUpdated(HeroModel hero)
+    {
+        await LoadFavoritesList();
+    }
+
+    private void ToggleFavoritesDrawer()
+    {
+        showFavoritesDrawer = !showFavoritesDrawer;
+    }
+
+    private void LoadFavorite(HeroModel fav)
+    {
+        currentHero = fav;
+        showFavoritesDrawer = false;
+    }
+
+    private async Task RemoveFavorite(HeroModel fav)
+    {
+        await HeroService.ToggleFavoriteAsync(fav);
+        await LoadFavoritesList();
+        if (currentHero != null && currentHero.Id == fav.Id)
+        {
+            currentHero.IsFavorite = false;
+        }
+    }
+}

@@ -1,0 +1,172 @@
+@using SuperHeroes.Client.Services
+@using SuperHeroes.Client.Models
+@inject DiceThemeService ThemeService
+@implements IDisposable
+
+<div class="dice-theme-customizer glass-panel">
+    <div class="theme-header">
+        <div class="theme-title-wrap">
+            <span class="theme-icon">🎨</span>
+            <span class="theme-title">Dice Theme & Color Customizer</span>
+        </div>
+        <button class="btn-toggle-custom" @onclick="ToggleExpanded">
+            @(isExpanded ? "Collapse ▲" : "Customize Colors ▼")
+        </button>
+    </div>
+
+    <!-- Theme Presets Strip -->
+    <div class="theme-presets-strip">
+        @foreach (var preset in DiceTheme.PresetThemes)
+        {
+            var isSelected = ThemeService.CurrentTheme.Id == preset.Id;
+            <button type="button"
+                    class="preset-badge-btn @(isSelected ? "active-preset" : "")"
+                    @onclick="() => SelectPreset(preset)"
+                    title="@preset.Description">
+                <span class="preset-name">@preset.Name</span>
+                <div class="preset-mini-preview">
+                    <span class="mini-swatch" style="background-color: @preset.D4Color;"></span>
+                    <span class="mini-swatch" style="background-color: @preset.D6Color;"></span>
+                    <span class="mini-swatch" style="background-color: @preset.D8Color;"></span>
+                    <span class="mini-swatch" style="background-color: @preset.D10Color;"></span>
+                    <span class="mini-swatch" style="background-color: @preset.D12Color;"></span>
+                </div>
+            </button>
+        }
+    </div>
+
+    <!-- Expanded Color Picker Controls -->
+    @if (isExpanded)
+    {
+        <div class="color-picker-grid">
+            <div class="color-pick-item">
+                <label>d4 Die</label>
+                <div class="color-input-wrapper">
+                    <input type="color" value="@ThemeService.CurrentTheme.D4Color" @onchange="e => UpdateDieColor(4, e.Value?.ToString())" />
+                    <CortexDice Die="4" Size="small" />
+                </div>
+            </div>
+
+            <div class="color-pick-item">
+                <label>d6 Die</label>
+                <div class="color-input-wrapper">
+                    <input type="color" value="@ThemeService.CurrentTheme.D6Color" @onchange="e => UpdateDieColor(6, e.Value?.ToString())" />
+                    <CortexDice Die="6" Size="small" />
+                </div>
+            </div>
+
+            <div class="color-pick-item">
+                <label>d8 Die</label>
+                <div class="color-input-wrapper">
+                    <input type="color" value="@ThemeService.CurrentTheme.D8Color" @onchange="e => UpdateDieColor(8, e.Value?.ToString())" />
+                    <CortexDice Die="8" Size="small" />
+                </div>
+            </div>
+
+            <div class="color-pick-item">
+                <label>d10 Die</label>
+                <div class="color-input-wrapper">
+                    <input type="color" value="@ThemeService.CurrentTheme.D10Color" @onchange="e => UpdateDieColor(10, e.Value?.ToString())" />
+                    <CortexDice Die="10" Size="small" />
+                </div>
+            </div>
+
+            <div class="color-pick-item">
+                <label>d12 Die</label>
+                <div class="color-input-wrapper">
+                    <input type="color" value="@ThemeService.CurrentTheme.D12Color" @onchange="e => UpdateDieColor(12, e.Value?.ToString())" />
+                    <CortexDice Die="12" Size="small" />
+                </div>
+            </div>
+
+            <div class="color-pick-item">
+                <label>d2 Die</label>
+                <div class="color-input-wrapper">
+                    <input type="color" value="@ThemeService.CurrentTheme.D2Color" @onchange="e => UpdateDieColor(2, e.Value?.ToString())" />
+                    <CortexDice Die="2" Size="small" />
+                </div>
+            </div>
+
+            <div class="color-pick-item">
+                <label>Border Line</label>
+                <div class="color-input-wrapper">
+                    <input type="color" value="@ThemeService.CurrentTheme.StrokeColor" @onchange="e => UpdateStrokeColor(e.Value?.ToString())" />
+                </div>
+            </div>
+
+            <div class="color-pick-item">
+                <label>Number Text</label>
+                <div class="color-input-wrapper">
+                    <input type="color" value="@ThemeService.CurrentTheme.TextColor" @onchange="e => UpdateTextColor(e.Value?.ToString())" />
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isExpanded = false;
+
+    protected override void OnInitialized()
+    {
+        ThemeService.OnThemeChanged += HandleThemeChanged;
+    }
+
+    private void HandleThemeChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleExpanded()
+    {
+        isExpanded = !isExpanded;
+    }
+
+    private async Task SelectPreset(DiceTheme preset)
+    {
+        await ThemeService.SetThemeAsync(new DiceTheme
+        {
+            Id = preset.Id,
+            Name = preset.Name,
+            Description = preset.Description,
+            D2Color = preset.D2Color,
+            D4Color = preset.D4Color,
+            D6Color = preset.D6Color,
+            D8Color = preset.D8Color,
+            D10Color = preset.D10Color,
+            D12Color = preset.D12Color,
+            StrokeColor = preset.StrokeColor,
+            TextColor = preset.TextColor,
+            StrokeWidth = preset.StrokeWidth
+        });
+    }
+
+    private async Task UpdateDieColor(int die, string? color)
+    {
+        if (!string.IsNullOrEmpty(color))
+        {
+            await ThemeService.SetCustomColorAsync(die, color);
+        }
+    }
+
+    private async Task UpdateStrokeColor(string? color)
+    {
+        if (!string.IsNullOrEmpty(color))
+        {
+            await ThemeService.SetStrokeColorAsync(color);
+        }
+    }
+
+    private async Task UpdateTextColor(string? color)
+    {
+        if (!string.IsNullOrEmpty(color))
+        {
+            await ThemeService.SetTextColorAsync(color);
+        }
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnThemeChanged -= HandleThemeChanged;
+    }
+}

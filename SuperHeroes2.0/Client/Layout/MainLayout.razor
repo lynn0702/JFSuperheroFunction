@@ -1,0 +1,25 @@
+@inherits LayoutComponentBase
+
+<div class="page hero-app-container">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4 app-header-strip">
+            <div class="domain-badge">
+                <span class="status-indicator"></span>
+                <span>heroes.lynnjones.rocks</span>
+            </div>
+            <div class="header-links">
+                <a href="https://github.com/lynn0702/JFSuperheroFunction" target="_blank" rel="noopener noreferrer" class="github-link">
+                    GitHub Repo
+                </a>
+            </div>
+        </div>
+
+        <article class="content px-4 py-3">
+            @Body
+        </article>
+    </main>
+</div>

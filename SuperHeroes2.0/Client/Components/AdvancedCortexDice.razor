@@ -1,0 +1,58 @@
+@using SuperHeroes.Client.Models
+
+<div class="advanced-dice-container @Css">
+    <div class="dice-stepper-btn step-up" @onclick="IncrementDie" title="Step up (+1 die tier)">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M12 4l-8 8h6v8h4v-8h6z"/>
+        </svg>
+    </div>
+
+    <div class="advanced-dice-main">
+        <CortexDice Die="Die" Size="@Size" FillColor="@FillColor" StrokeColor="@StrokeColor" TextColor="@TextColor" Interactive="true" DieChanged="OnDieChanged" />
+    </div>
+
+    <div class="dice-stepper-btn step-down" @onclick="DecrementDie" title="Step down (-1 die tier)">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M12 20l8-8h-6V4h-4v8H4z"/>
+        </svg>
+    </div>
+
+    @if (ShowPoolControls)
+    {
+        <div class="dice-pool-actions">
+            <button type="button" class="btn-pool-action" @onclick="() => OnAdd?.Invoke()" title="Add die to pool">+</button>
+            <button type="button" class="btn-pool-action" @onclick="() => OnRemove?.Invoke()" title="Remove die from pool">-</button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int Die { get; set; } = 8;
+    [Parameter] public EventCallback<int> DieChanged { get; set; }
+    [Parameter] public string Size { get; set; } = "large";
+    [Parameter] public string Css { get; set; } = "";
+    [Parameter] public string? FillColor { get; set; }
+    [Parameter] public string? StrokeColor { get; set; }
+    [Parameter] public string? TextColor { get; set; }
+    [Parameter] public bool ShowPoolControls { get; set; } = false;
+    [Parameter] public Action? OnAdd { get; set; }
+    [Parameter] public Action? OnRemove { get; set; }
+
+    private async Task IncrementDie()
+    {
+        Die = Die < 12 ? Die + 2 : 2;
+        await DieChanged.InvokeAsync(Die);
+    }
+
+    private async Task DecrementDie()
+    {
+        Die = Die > 2 ? Die - 2 : 12;
+        await DieChanged.InvokeAsync(Die);
+    }
+
+    private async Task OnDieChanged(int newDie)
+    {
+        Die = newDie;
+        await DieChanged.InvokeAsync(Die);
+    }
+}

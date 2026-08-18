@@ -1,0 +1,108 @@
+@page "/batch"
+@using SuperHeroes.Client.Models
+@using SuperHeroes.Client.Services
+@using SuperHeroes.Client.Components
+@inject HeroApiService HeroService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Batch Superhero Generator | heroes.lynnjones.rocks</PageTitle>
+
+<div class="batch-page">
+    <div class="generator-controls-bar glass-panel">
+        <div class="hero-brand">
+            <h1 class="brand-title">BATCH HERO GENERATOR</h1>
+            <p class="brand-sub">Generate up to 100 random Cortex superheroes in a single roll.</p>
+        </div>
+
+        <div class="batch-options-row">
+            <div class="count-selector">
+                <label>Batch Size:</label>
+                <select class="form-select batch-select" @bind="batchCount">
+                    <option value="5">5 Heroes</option>
+                    <option value="10">10 Heroes</option>
+                    <option value="25">25 Heroes</option>
+                    <option value="50">50 Heroes</option>
+                    <option value="100">100 Heroes</option>
+                </select>
+            </div>
+
+            <button class="btn-generate-hero pulse-glow" @onclick="GenerateBatch" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <span>Generating @batchCount Heroes...</span>
+                }
+                else
+                {
+                    <span>🎲 Generate @batchCount Heroes</span>
+                }
+            </button>
+        </div>
+    </div>
+
+    <!-- Dice Theme Selector -->
+    <DiceColorSelector />
+
+    @if (heroes.Count > 0)
+    {
+        <!-- Filter & Search Bar -->
+        <div class="batch-search-bar glass-panel">
+            <div class="search-input-wrap">
+                <input type="text" class="form-control hero-search" placeholder="Search distinctions, powers, specialties, milestones..." @bind="searchTerm" @bind:event="oninput" />
+            </div>
+            <div class="search-stats">
+                Showing <strong>@FilteredHeroes.Count()</strong> of <strong>@heroes.Count</strong> heroes
+            </div>
+        </div>
+
+        <!-- Heroes Grid -->
+        <div class="batch-heroes-grid">
+            @foreach (var hero in FilteredHeroes)
+            {
+                <HeroCard Hero="@hero" />
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private int batchCount = 10;
+    private bool isLoading = false;
+    private List<HeroModel> heroes = new();
+    private string searchTerm = "";
+
+    private IEnumerable<HeroModel> FilteredHeroes
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm)) return heroes;
+            var term = searchTerm.Trim().ToLower();
+
+            return heroes.Where(h =>
+                h.Distinctions.Any(d => d.ToLower().Contains(term)) ||
+                h.Specialties.Any(s => s.Name.ToLower().Contains(term)) ||
+                h.PowerSets.Any(ps => ps.Powers.Any(p => p.Name.ToLower().Contains(term)) || ps.Sfx.Any(s => s.ToLower().Contains(term))) ||
+                h.Milestones.Any(m => m.ToLower().Contains(term))
+            );
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GenerateBatch();
+    }
+
+    private async Task GenerateBatch()
+    {
+        if (isLoading) return;
+        isLoading = true;
+        try
+        {
+            heroes = await HeroService.GenerateBatchHeroesAsync(batchCount);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
